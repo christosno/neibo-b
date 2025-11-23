@@ -8,7 +8,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     status: "OK",
     timestamp: new Date().toISOString(),
-    service: "🚀 Hello from Neibo api",
+    service: "🚀 Hello from Neibo api - this is a test",
   });
 });
 
