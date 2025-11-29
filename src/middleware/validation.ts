@@ -10,7 +10,47 @@ export const validateBody = (schema: ZodSchema) => {
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({
-          error: "Validation failed",
+          error: "Body Validation failed",
+          details: error.issues.map((issue) => ({
+            field: issue.path.join("."),
+            message: issue.message,
+          })),
+        });
+      }
+      next(error);
+    }
+  };
+};
+
+export const validateParams = (schema: ZodSchema) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      schema.parse(req.params);
+      next();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          error: "Params Validation failed",
+          details: error.issues.map((issue) => ({
+            field: issue.path.join("."),
+            message: issue.message,
+          })),
+        });
+      }
+      next(error);
+    }
+  };
+};
+
+export const validateQuery = (schema: ZodSchema) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      schema.parse(req.query);
+      next();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          error: "Query Validation failed",
           details: error.issues.map((issue) => ({
             field: issue.path.join("."),
             message: issue.message,
