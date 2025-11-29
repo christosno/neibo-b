@@ -1,9 +1,10 @@
 import express from "express";
+import authRoutes from "./routes/authRoutes.ts";
+import walkRoutes from "./routes/walkRoutes.ts";
+import userRoutes from "./routes/userRoutes.ts";
 
-// Create Express application
 const app = express();
 
-// Health check endpoint - always good to have!
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "OK",
@@ -12,8 +13,10 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Export the app for use in other modules (like tests)
+app.use("/api/auth", authRoutes);
+app.use("/api/walks", walkRoutes);
+app.use("/api/users", userRoutes);
+
 export { app };
 
-// Default export for convenience
 export default app;
