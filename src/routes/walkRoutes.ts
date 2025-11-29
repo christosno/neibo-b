@@ -1,4 +1,10 @@
 import { Router } from "express";
+import { validateBody } from "../middleware/validation.ts";
+import { z } from "zod";
+
+const createWalkSchema = z.object({
+  name: z.string().min(1),
+});
 
 const router = Router();
 
@@ -14,9 +20,9 @@ router.get("/:id", (req, res) => {
   });
 });
 
-router.post("/", (req, res) => {
+router.post("/", validateBody(createWalkSchema), (req, res) => {
   res.status(200).json({
-    message: "Walk created",
+    message: `Walk ${req.body.name} created`,
   });
 });
 
