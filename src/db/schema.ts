@@ -6,16 +6,10 @@ import {
   varchar,
   boolean,
   integer,
-  customType,
+  decimal,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-
-const geographyPoint = customType<{ data: string; driverData: string }>({
-  dataType() {
-    return "geography(Point, 4326)";
-  },
-});
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -61,7 +55,8 @@ export const spots = pgTable("spots", {
     .notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description").notNull().default(""),
-  location: geographyPoint("location"),
+  latitude: decimal("latitude").notNull(),
+  longitude: decimal("longitude").notNull(),
   reach_radius: integer("reach_radius").notNull().default(50),
   positionOrder: integer("position_order").notNull().default(0),
   imageUrls: text("image_urls").array(),
@@ -136,9 +131,7 @@ export const userWalkProgress = pgTable("user_walk_progress", {
     .references(() => walks.id, { onDelete: "cascade" })
     .notNull(),
   currentSpotId: uuid("current_spot_id").references(() => spots.id),
-  visitedSpots: uuid("visited_spots")
-    .array()
-    .references(() => spots.id),
+  visitedSpots: uuid("visited_spots").array(),
   completed: boolean("completed").notNull().default(false),
   completedAt: timestamp("completed_at"),
   startedAt: timestamp("started_at"),
