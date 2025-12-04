@@ -16,8 +16,8 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   username: varchar("username", { length: 255 }).notNull().unique(),
   password: varchar("password", { length: 255 }).notNull(),
-  firstName: varchar("first_name", { length: 50 }).notNull(),
-  lastName: varchar("last_name", { length: 50 }).notNull(),
+  firstName: varchar("first_name", { length: 50 }),
+  lastName: varchar("last_name", { length: 50 }),
   profilePicture: varchar("profile_picture", { length: 255 })
     .notNull()
     .default(""),
@@ -216,6 +216,7 @@ export const userWalkProgressRelations = relations(
 
 // Types / Schemas
 export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 export type Walk = typeof walks.$inferSelect;
 export type Spot = typeof spots.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
