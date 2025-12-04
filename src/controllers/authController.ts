@@ -24,7 +24,7 @@ export const register = async (req: Request<any, NewUser>, res: Response) => {
         createdAt: users.createdAt,
       });
 
-    const token = generateToken({
+    const token = await generateToken({
       id: user.id,
       email: user.email,
       username: user.username,
