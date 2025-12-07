@@ -36,13 +36,13 @@ export const walks = pgTable("walks", {
   authorId: uuid("author_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
   description: text("description").notNull().default(""),
   coverImageUrl: varchar("cover_image_url", { length: 255 })
     .notNull()
     .default(""),
-  duration_estimate: integer("duration_estimate"),
-  distance_estimate: integer("distance_estimate"),
+  duration_estimate: decimal("duration_estimate"),
+  distance_estimate: decimal("distance_estimate"),
   isPublic: boolean("is_public").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow().notNull(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().notNull(),
@@ -219,6 +219,7 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Walk = typeof walks.$inferSelect;
 export type Spot = typeof spots.$inferSelect;
+export type NewSpot = typeof spots.$inferInsert;
 export type Tag = typeof tags.$inferSelect;
 export type WalkReview = typeof walkReviews.$inferSelect;
 export type WalkComment = typeof walkComments.$inferSelect;

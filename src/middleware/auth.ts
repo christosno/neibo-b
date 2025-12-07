@@ -18,7 +18,6 @@ export const authenticateToken = async (
     }
 
     const payload = await verifyToken(token);
-
     req.user = payload;
     next();
   } catch (error) {
