@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.ts";
 import { db } from "../db/connection.ts";
 import { walks, walkTags, spots, type NewSpot } from "../db/schema.ts";
-import { eq, count } from "drizzle-orm";
+import { eq, count, desc } from "drizzle-orm";
 
 export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -101,11 +101,6 @@ export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
     });
   }
 };
-
-export const getUserWalks = async (
-  req: AuthenticatedRequest,
-  res: Response
-) => {};
 
 export const getAllWalks = async (req: Request, res: Response) => {
   try {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticateToken } from "../middleware/auth.ts";
+import { getWalksByUserCreator } from "../controllers/usersController.ts";
 
 const router = Router();
 
@@ -10,6 +11,10 @@ router.get("/", (req, res) => {
     message: "Users fetched",
   });
 });
+
+// IMPORTANT: Specific routes must come BEFORE parameterized routes
+// get all walks that creates a user
+router.get("/walks", getWalksByUserCreator);
 
 router.get("/:id", (req, res) => {
   res.status(200).json({
