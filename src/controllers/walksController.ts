@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.ts";
 import { db } from "../db/connection.ts";
 import { walks, walkTags, spots, type NewSpot } from "../db/schema.ts";
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 
 export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -98,6 +98,69 @@ export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
       ...(process.env.NODE_ENV !== "production" && {
         details: error instanceof Error ? error.message : String(error),
       }),
+    });
+  }
+};
+
+export const getUserWalks = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {};
+
+export const getAllWalks = async (req: Request, res: Response) => {
+  try {
+    // Parse and validate query parameters
+    const pageParam = req.query.page;
+    const limitParam = req.query.limit;
+
+    const page = Math.max(1, Number(pageParam) || 1);
+    const limit = Math.max(1, Math.min(100, Number(limitParam) || 10)); // Max 100 items per page
+    const offset = (page - 1) * limit;
+
+    // Execute queries in parallel for better performance
+    const [walksData, totalCountResult] = await Promise.all([
+      // Get paginated walks
+      db.select().from(walks).limit(limit).offset(offset),
+      // Get total count of all walks
+      db.select({ count: count() }).from(walks),
+    ]);
+
+    const total = totalCountResult[0]?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrevious = page > 1;
+
+    // Build pagination URLs
+    const baseUrl = `${req.protocol}://${req.get("host")}${req.baseUrl}${
+      req.path
+    }`;
+    const buildUrl = (pageNum: number) => {
+      const params = new URLSearchParams();
+      params.set("page", pageNum.toString());
+      if (limitParam) params.set("limit", limit.toString());
+      return `${baseUrl}?${params.toString()}`;
+    };
+
+    res.status(200).json({
+      message: "Walks fetched successfully",
+      data: {
+        walks: walksData,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext,
+          hasPrevious,
+          next: hasNext ? buildUrl(page + 1) : null,
+          previous: hasPrevious ? buildUrl(page - 1) : null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ Get all walks failed:", error);
+    res.status(500).json({
+      error: "Failed to get all walks",
     });
   }
 };

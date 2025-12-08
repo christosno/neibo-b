@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validateBody, validateParams } from "../middleware/validation.ts";
 import { z } from "zod";
 import { authenticateToken } from "../middleware/auth.ts";
-import { createWalk } from "../controllers/walksController.ts";
+import { createWalk, getAllWalks } from "../controllers/walksController.ts";
 
 const createWalkSchema = z.object({
   name: z.string().min(1),
@@ -36,13 +36,9 @@ const updateWalkParamsSchema = z.object({
 
 const router = Router();
 
-router.use(authenticateToken);
-
-router.get("/", (req, res) => {
-  res.status(200).json({
-    message: "Walks fetched",
-  });
-});
+// get all available walks
+// /api/walks?page=2&limit=20
+router.get("/", getAllWalks);
 
 router.get("/:id", (req, res) => {
   res.status(200).json({
@@ -50,11 +46,19 @@ router.get("/:id", (req, res) => {
   });
 });
 
-router.post("/", validateBody(createWalkSchema), createWalk);
+router.post(
+  "/",
+  [validateBody(createWalkSchema), authenticateToken],
+  createWalk
+);
 
 router.put(
   "/:id",
-  [validateParams(updateWalkParamsSchema), validateBody(updateWalkSchema)],
+  [
+    validateParams(updateWalkParamsSchema),
+    validateBody(updateWalkSchema),
+    authenticateToken,
+  ],
   (req, res) => {
     res.status(200).json({
       message: `Walk ${req.params.id} updated`,
@@ -62,7 +66,7 @@ router.put(
   }
 );
 
-router.delete("/:id", (req, res) => {
+router.delete("/:id", authenticateToken, (req, res) => {
   res.status(200).json({
     message: `Walk ${req.params.id} deleted`,
   });
