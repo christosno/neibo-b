@@ -1,10 +1,15 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.ts";
 import { db } from "../db/connection.ts";
 import { walks, walkTags, spots, type NewSpot } from "../db/schema.ts";
 import { eq, count, desc, and } from "drizzle-orm";
+import type { CustomError } from "../middleware/errorHandler.ts";
 
-export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
+export const createWalk = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const {
       name,
@@ -26,17 +31,12 @@ export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
       .limit(1);
 
     if (walkNameExists.length > 0) {
-      return res.status(400).json({
-        error: "Walk name already exists",
-      });
+      const error = new Error("Walk name already exists") as CustomError;
+      error.status = 400;
+      error.name = "ValidationError";
+      throw error;
     }
-
-    // All database operations must be inside the transaction
-    // CRITICAL: If ANY operation fails (throws an error), Drizzle will automatically rollback
-    // Do NOT catch errors inside the transaction callback - let them propagate naturally
     const result = await db.transaction(async (tx) => {
-      // Insert walk first
-      // If this fails, the entire transaction will rollback automatically
       const [walk] = await tx
         .insert(walks)
         .values({
@@ -91,21 +91,28 @@ export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
       spots: result.spots,
     });
   } catch (error) {
-    console.error("❌ Create walk failed:", error);
-
-    return res.status(500).json({
-      error: "Failed to create walk",
-      ...(process.env.NODE_ENV !== "production" && {
-        details: error instanceof Error ? error.message : String(error),
-      }),
-    });
+    next(error);
   }
 };
 
-export const updateWalk = async (req: AuthenticatedRequest, res: Response) => {
+export const updateWalk = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { id: walkId } = req.params;
     const userId = req.user.id;
+
+    // Validate UUID format
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(walkId)) {
+      const error = new Error("Invalid walk ID format") as CustomError;
+      error.status = 400;
+      error.name = "ValidationError";
+      throw error;
+    }
 
     const { spots: walkSpots, tagIds, ...walkData } = req.body;
 
@@ -117,7 +124,14 @@ export const updateWalk = async (req: AuthenticatedRequest, res: Response) => {
         .where(and(eq(walks.id, walkId), eq(walks.authorId, userId)))
         .returning();
 
-      if (!updatedWalk) throw new Error("Walk not found");
+      if (!updatedWalk) {
+        const error = new Error(
+          "Walk not found or you don't have permission to update it"
+        ) as CustomError;
+        error.status = 404;
+        error.name = "NotFoundError";
+        throw error;
+      }
 
       if (tagIds !== undefined) {
         // remove existing tags
@@ -169,14 +183,32 @@ export const updateWalk = async (req: AuthenticatedRequest, res: Response) => {
       spots: result.spots,
     });
   } catch (error) {
-    console.error("❌ Update walk failed:", error);
-    res.status(500).json({
-      error: "Failed to update walk",
-    });
+    // If it's already a CustomError with status, pass it through
+    if ((error as CustomError).status) {
+      return next(error);
+    }
+
+    // Handle database errors - check if it's a PostgreSQL error
+    const dbError = error as any;
+    if (dbError?.cause || dbError?.code) {
+      const customError = new Error(
+        dbError.cause?.message || dbError.message || "Database error occurred"
+      ) as CustomError;
+      customError.status = 400;
+      customError.name = "DatabaseError";
+      return next(customError);
+    }
+
+    // For any other errors, pass through
+    next(error);
   }
 };
 
-export const getAllWalks = async (req: Request, res: Response) => {
+export const getAllWalks = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     // Parse and validate query parameters
     const pageParam = req.query.page;
@@ -227,9 +259,6 @@ export const getAllWalks = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("❌ Get all walks failed:", error);
-    res.status(500).json({
-      error: "Failed to get all walks",
-    });
+    next(error);
   }
 };

@@ -2,11 +2,12 @@ import { desc, eq } from "drizzle-orm";
 import db from "../db/connection.ts";
 import type { AuthenticatedRequest } from "../middleware/auth.ts";
 import { walks } from "../db/schema.ts";
-import type { Response } from "express";
+import type { NextFunction, Response } from "express";
 
 export const getWalksByUserCreator = async (
   req: AuthenticatedRequest,
-  res: Response
+  res: Response,
+  next: NextFunction
 ) => {
   try {
     const userId = req.user.id;
@@ -70,9 +71,6 @@ export const getWalksByUserCreator = async (
       data: transformedResponse,
     });
   } catch (error) {
-    console.error("❌ Get user walks failed:", error);
-    res.status(500).json({
-      error: "Failed to get user walks",
-    });
+    next(error);
   }
 };

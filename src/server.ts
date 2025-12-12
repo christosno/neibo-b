@@ -8,9 +8,11 @@ import userRoutes from "./routes/userRoutes.ts";
 import cors from "cors";
 import morgan from "morgan";
 import helmet from "helmet";
+import { errorHandler, notFound } from "./middleware/errorHandler.ts";
 
 const app = express();
 
+// Regular middleware
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
@@ -29,9 +31,16 @@ app.get("/health", (req, res) => {
   });
 });
 
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/walks", walkRoutes);
 app.use("/api/users", userRoutes);
+
+// 404 handler - MUST come after all valid routes
+app.use(notFound);
+
+// Global error handler - MUST be last
+app.use(errorHandler);
 
 export { app };
 

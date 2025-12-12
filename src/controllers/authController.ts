@@ -1,12 +1,17 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import bcCrypt from "bcrypt";
 import { db } from "../db/connection.ts";
 import { users, type NewUser } from "../db/schema.ts";
 import { generateToken } from "../utils/jwt.ts";
 import { comparePasswords, hashPassword } from "../utils/passwords.ts";
 import { eq } from "drizzle-orm";
+import type { CustomError } from "../middleware/errorHandler.ts";
 
-export const register = async (req: Request<any, NewUser>, res: Response) => {
+export const register = async (
+  req: Request<any, NewUser>,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const hashedPassword = await hashPassword(req.body.password);
 
@@ -37,30 +42,33 @@ export const register = async (req: Request<any, NewUser>, res: Response) => {
       token,
     });
   } catch (error) {
-    console.error("❌ Register failed:", error);
-    res.status(500).json({
-      error: "Failed to create user",
-    });
+    next(error);
   }
 };
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { email, password } = req.body;
     const [user] = await db.select().from(users).where(eq(users.email, email));
 
     if (!user) {
-      return res.status(401).json({
-        error: "Invalid credentials",
-      });
+      const error = new Error("Invalid credentials") as CustomError;
+      error.status = 401;
+      error.name = "UnauthorizedError";
+      throw error;
     }
 
     const isPasswordValid = await comparePasswords(password, user.password);
 
     if (!isPasswordValid) {
-      return res.status(401).json({
-        error: "Invalid credentials",
-      });
+      const error = new Error("Invalid credentials") as CustomError;
+      error.status = 401;
+      error.name = "UnauthorizedError";
+      throw error;
     }
 
     const token = await generateToken({
@@ -85,9 +93,6 @@ export const login = async (req: Request, res: Response) => {
       })
       .status(201);
   } catch (error) {
-    console.error("❌ Login failed:", error);
-    res.status(500).json({
-      error: "Failed to login",
-    });
+    next(error);
   }
 };
