@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.ts";
 import { db } from "../db/connection.ts";
 import { walks, walkTags, spots, type NewSpot } from "../db/schema.ts";
-import { eq, count, desc } from "drizzle-orm";
+import { eq, count, desc, and } from "drizzle-orm";
 
 export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -98,6 +98,80 @@ export const createWalk = async (req: AuthenticatedRequest, res: Response) => {
       ...(process.env.NODE_ENV !== "production" && {
         details: error instanceof Error ? error.message : String(error),
       }),
+    });
+  }
+};
+
+export const updateWalk = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id: walkId } = req.params;
+    const userId = req.user.id;
+
+    const { spots: walkSpots, tagIds, ...walkData } = req.body;
+
+    const result = await db.transaction(async (tx) => {
+      // Update the walk
+      const [updatedWalk] = await tx
+        .update(walks)
+        .set({ ...walkData, updatedAt: new Date() })
+        .where(and(eq(walks.id, walkId), eq(walks.authorId, userId)))
+        .returning();
+
+      if (!updatedWalk) throw new Error("Walk not found");
+
+      if (tagIds !== undefined) {
+        // remove existing tags
+        await tx.delete(walkTags).where(eq(walkTags.walkId, updatedWalk.id));
+
+        // add new tags
+        if (tagIds.length > 0) {
+          const walkTagsValues = tagIds.map((tagId: string) => ({
+            walkId: updatedWalk.id,
+            tagId,
+          }));
+
+          await tx.insert(walkTags).values(walkTagsValues);
+        }
+      }
+
+      if (walkSpots !== undefined) {
+        // remove existing spots
+        await tx.delete(spots).where(eq(spots.walkId, updatedWalk.id));
+
+        // add new spots
+        if (walkSpots.length > 0) {
+          const spotValues = walkSpots.map((spot: NewSpot) => ({
+            walkId: updatedWalk.id,
+            ...spot,
+          }));
+
+          const newSpots = await tx
+            .insert(spots)
+            .values(spotValues)
+            .returning();
+
+          return {
+            walk: updatedWalk,
+            spots: newSpots,
+          };
+        }
+      }
+
+      return {
+        walk: updatedWalk,
+        spots: walkSpots,
+      };
+    });
+
+    return res.status(200).json({
+      message: "Walk updated successfully",
+      walk: result.walk,
+      spots: result.spots,
+    });
+  } catch (error) {
+    console.error("❌ Update walk failed:", error);
+    res.status(500).json({
+      error: "Failed to update walk",
     });
   }
 };

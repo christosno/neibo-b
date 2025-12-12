@@ -2,7 +2,11 @@ import { Router } from "express";
 import { validateBody, validateParams } from "../middleware/validation.ts";
 import { z } from "zod";
 import { authenticateToken } from "../middleware/auth.ts";
-import { createWalk, getAllWalks } from "../controllers/walksController.ts";
+import {
+  createWalk,
+  getAllWalks,
+  updateWalk,
+} from "../controllers/walksController.ts";
 
 const createWalkSchema = z.object({
   name: z.string().min(1),
@@ -26,9 +30,9 @@ const createWalkSchema = z.object({
   ),
 });
 
-const updateWalkSchema = z.object({
-  name: z.string().min(1),
-});
+// const updateWalkSchema = z.object({
+//   name: z.string().min(1),
+// });
 
 const updateWalkParamsSchema = z.object({
   id: z.string().min(1),
@@ -56,14 +60,10 @@ router.put(
   "/:id",
   [
     validateParams(updateWalkParamsSchema),
-    validateBody(updateWalkSchema),
+    // validateBody(updateWalkSchema),
     authenticateToken,
   ],
-  (req, res) => {
-    res.status(200).json({
-      message: `Walk ${req.params.id} updated`,
-    });
-  }
+  updateWalk
 );
 
 router.delete("/:id", authenticateToken, (req, res) => {
