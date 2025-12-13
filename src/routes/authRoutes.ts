@@ -6,14 +6,30 @@ import z from "zod";
 
 const router = Router();
 
-router.post("/register", validateBody(userInsertSchema), register);
+const registerSchema = userInsertSchema.extend({
+  email: z.email("Invalid email format"),
+  username: z.string().min(1, "Username is required"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .refine((val) => val.length >= 8, {
+      message: "Password must be at least 8 characters long",
+    }),
+});
+
+router.post("/register", validateBody(registerSchema), register);
 
 const loginSchema = z.object({
   email: z.email("Invalid email format"),
   password: z
     .string()
-    .min(1, "Password is required")
-    .max(255, "Password must be less than 255 characters long"),
+    .optional()
+    .refine((val) => val !== undefined, {
+      message: "Password is required",
+    })
+    .refine((val) => val !== undefined && val.length >= 8, {
+      message: "Password must be at least 8 characters long",
+    }),
 });
 
 router.post("/login", validateBody(loginSchema), login);

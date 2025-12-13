@@ -15,6 +15,30 @@ export const register = async (
   try {
     const hashedPassword = await hashPassword(req.body.password);
 
+    const emailExists = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, req.body.email));
+
+    if (emailExists.length > 0) {
+      const error = new Error("Email already in use") as CustomError;
+      error.status = 400;
+      error.name = "ValidationError";
+      throw error;
+    }
+
+    const usernameExists = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, req.body.username));
+
+    if (usernameExists.length > 0) {
+      const error = new Error("Username already in use") as CustomError;
+      error.status = 400;
+      error.name = "ValidationError";
+      throw error;
+    }
+
     const [user] = await db
       .insert(users)
       .values({

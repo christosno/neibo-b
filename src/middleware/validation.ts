@@ -9,6 +9,12 @@ export const validateBody = (schema: ZodSchema) => {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
+        // If there's only one validation error, return the specific error message
+        if (error.issues.length === 1) {
+          return res.status(400).json({
+            error: error.issues[0].message,
+          });
+        }
         return res.status(400).json({
           error: "Body Validation failed",
           details: error.issues.map((issue) => ({

@@ -23,7 +23,7 @@ export const createUser = async (userData: Partial<NewUser> = {}) => {
     username: `test-${Math.random()}`,
     firstName: "Test",
     lastName: "User",
-    password: "test",
+    password: "testPassword123",
     isAdmin: false,
     isSuperAdmin: false,
     isDeleted: false,
