@@ -49,7 +49,7 @@ export const errorHandler = (
 
   if (err.name === "UnauthorizedError") {
     status = 401;
-    message = "Unauthorized";
+    message = err.message || "Unauthorized";
   }
 
   if (err.name === "ForbiddenError") {

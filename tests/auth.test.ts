@@ -115,4 +115,81 @@ describe("Authentication endpoints", () => {
       );
     });
   });
+
+  describe("POST /api/auth/login", () => {
+    it("should login a user with valid data", async () => {
+      const { user, rawPassword } = await createUser();
+      const credentials = {
+        email: user.email,
+        password: rawPassword,
+      };
+      const response = await request(app)
+        .post("/api/auth/login")
+        .send(credentials)
+        .expect(201);
+
+      expect(response.body).toHaveProperty("user");
+      expect(response.body).toHaveProperty("token");
+
+      expect(response.body.user).not.toHaveProperty("password");
+    });
+
+    it("should return 400 if email is not provided", async () => {
+      const { rawPassword } = await createUser();
+      const credentials = {
+        email: undefined,
+        password: rawPassword,
+      };
+      const response = await request(app)
+        .post("/api/auth/login")
+        .send(credentials)
+        .expect(400);
+
+      expect(response.body.error).toBe("Invalid email format");
+    });
+
+    it("should return 401 if email is not found", async () => {
+      const { rawPassword } = await createUser();
+      const credentials = {
+        email: "invalid-email@test.com",
+        password: rawPassword,
+      };
+      const response = await request(app)
+        .post("/api/auth/login")
+        .send(credentials)
+        .expect(401);
+
+      expect(response.body.error).toBe("Invalid credentials");
+    });
+
+    it("should return 400 if password is not at least 8 characters long", async () => {
+      const { user } = await createUser();
+      const credentials = {
+        email: user.email,
+        password: "test",
+      };
+      const response = await request(app)
+        .post("/api/auth/login")
+        .send(credentials)
+        .expect(400);
+
+      expect(response.body.error).toBe(
+        "Password must be at least 8 characters long"
+      );
+    });
+
+    it("should return 400 if password is not valid", async () => {
+      const { user } = await createUser();
+      const credentials = {
+        email: user.email,
+        password: "invalid-password",
+      };
+      const response = await request(app)
+        .post("/api/auth/login")
+        .send(credentials)
+        .expect(401);
+
+      expect(response.body.error).toBe("Invalid credentials");
+    });
+  });
 });

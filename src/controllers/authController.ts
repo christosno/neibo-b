@@ -101,21 +101,18 @@ export const login = async (
       username: user.username,
     });
 
-    return res
-      .status(200)
-      .json({
-        message: "Login successful",
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          createdAt: user.createdAt,
-        },
-        token,
-      })
-      .status(201);
+    return res.status(201).json({
+      message: "Login successful",
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        createdAt: user.createdAt,
+      },
+      token,
+    });
   } catch (error) {
     next(error);
   }

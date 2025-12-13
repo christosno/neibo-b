@@ -6,6 +6,7 @@ import z from "zod";
 
 const router = Router();
 
+// auth/register
 const registerSchema = userInsertSchema.extend({
   email: z.email("Invalid email format"),
   username: z.string().min(1, "Username is required"),
@@ -19,6 +20,7 @@ const registerSchema = userInsertSchema.extend({
 
 router.post("/register", validateBody(registerSchema), register);
 
+// auth/login
 const loginSchema = z.object({
   email: z.email("Invalid email format"),
   password: z
