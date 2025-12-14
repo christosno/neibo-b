@@ -8,6 +8,13 @@
       "when": 1765104154066,
       "tag": "0000_petite_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1765701355928,
+      "tag": "0001_happy_secret_warriors",
+      "breakpoints": true
     }
   ]
 }

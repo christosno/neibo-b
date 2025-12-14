@@ -1,0 +1,1 @@
+ALTER TABLE "walks" ADD CONSTRAINT "walks_name_unique" UNIQUE("name");
