@@ -139,6 +139,16 @@ export const userWalkProgress = pgTable("user_walk_progress", {
   updatedAt: timestamp("updated_at").notNull().defaultNow().notNull(),
 });
 
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow().notNull(),
+});
+
 // Relations
 export const userRelations = relations(users, ({ many }) => ({
   walks: many(walks),
@@ -146,6 +156,7 @@ export const userRelations = relations(users, ({ many }) => ({
   userWalkProgress: many(userWalkProgress),
   walkReviews: many(walkReviews),
   walkComments: many(walkComments),
+  refreshTokens: many(refreshTokens),
 }));
 
 export const walkRelations = relations(walks, ({ many, one }) => ({
@@ -214,6 +225,13 @@ export const userWalkProgressRelations = relations(
   })
 );
 
+export const refreshTokenRelations = relations(refreshTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [refreshTokens.userId],
+    references: [users.id],
+  }),
+}));
+
 // Types / Schemas
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -231,6 +249,8 @@ export type WalkSubscription = typeof walkSubscriptions.$inferSelect;
 export type NewWalkSubscription = typeof walkSubscriptions.$inferInsert;
 export type UserWalkProgress = typeof userWalkProgress.$inferSelect;
 export type NewUserWalkProgress = typeof userWalkProgress.$inferInsert;
+export type RefreshToken = typeof refreshTokens.$inferSelect;
+export type NewRefreshToken = typeof refreshTokens.$inferInsert;
 
 export const userInsertSchema = createInsertSchema(users);
 export const walkInsertSchema = createInsertSchema(walks);
@@ -242,6 +262,7 @@ export const walkSubscriptionInsertSchema =
   createInsertSchema(walkSubscriptions);
 export const userWalkProgressInsertSchema =
   createInsertSchema(userWalkProgress);
+export const refreshTokenInsertSchema = createInsertSchema(refreshTokens);
 
 export const userSelectSchema = createSelectSchema(users);
 export const walkSelectSchema = createSelectSchema(walks);
@@ -253,3 +274,4 @@ export const walkSubscriptionSelectSchema =
   createSelectSchema(walkSubscriptions);
 export const userWalkProgressSelectSchema =
   createSelectSchema(userWalkProgress);
+export const refreshTokenSelectSchema = createSelectSchema(refreshTokens);

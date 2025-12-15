@@ -15,6 +15,13 @@
       "when": 1765701355928,
       "tag": "0001_happy_secret_warriors",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765821810569,
+      "tag": "0002_wandering_misty_knight",
+      "breakpoints": true
     }
   ]
 }

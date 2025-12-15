@@ -9,6 +9,7 @@ import {
   userWalkProgress,
   walkTags,
   users,
+  refreshTokens,
 } from "../../src/db/schema.ts";
 import { sql } from "drizzle-orm";
 import { execSync } from "child_process";
@@ -28,6 +29,7 @@ export default async function setup() {
     await db.execute(sql`DROP TABLE IF EXISTS ${walkSubscriptions} CASCADE`);
     await db.execute(sql`DROP TABLE IF EXISTS ${userWalkProgress} CASCADE`);
     await db.execute(sql`DROP TABLE IF EXISTS ${walkTags} CASCADE`);
+    await db.execute(sql`DROP TABLE IF EXISTS ${refreshTokens} CASCADE`);
 
     console.log("🚀 Pushing schema using drizzle-kit...");
     execSync(
@@ -55,6 +57,7 @@ export default async function setup() {
       await db.execute(sql`DROP TABLE IF EXISTS ${walkSubscriptions} CASCADE`);
       await db.execute(sql`DROP TABLE IF EXISTS ${userWalkProgress} CASCADE`);
       await db.execute(sql`DROP TABLE IF EXISTS ${walkTags} CASCADE`);
+      await db.execute(sql`DROP TABLE IF EXISTS ${refreshTokens} CASCADE`);
       process.exit(0);
     } catch (error) {
       console.error("❌ Test db cleanup failed:", error);
