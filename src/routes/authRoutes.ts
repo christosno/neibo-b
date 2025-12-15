@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { login, register } from "../controllers/authController.ts";
+import {
+  login,
+  register,
+  refreshToken,
+} from "../controllers/authController.ts";
 import { validateBody } from "../middleware/validation.ts";
 import { userInsertSchema } from "../db/schema.ts";
 import z from "zod";
@@ -35,5 +39,12 @@ const loginSchema = z.object({
 });
 
 router.post("/login", validateBody(loginSchema), login);
+
+// auth/refresh
+const refreshTokenSchema = z.object({
+  refreshToken: z.string().min(1, "Refresh token is required"),
+});
+
+router.post("/refresh", validateBody(refreshTokenSchema), refreshToken);
 
 export default router;

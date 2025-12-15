@@ -1,4 +1,4 @@
-import env from "../../env.ts";
+import env, { isDev } from "../../env.ts";
 import type { Request, Response, NextFunction } from "express";
 
 export type CustomError = Error & {
@@ -64,10 +64,13 @@ export const errorHandler = (
 
   res.status(status).json({
     error: message,
-    ...(env.APP_STAGE === "dev" && {
+    ...(isDev() && {
       stack: err.stack,
       details: err.message,
       ...(pgError && { databaseError: pgError.message || pgError.detail }),
+    }),
+    ...(env.APP_STAGE === "staging" && {
+      details: err.message,
     }),
   });
 };
