@@ -9,6 +9,7 @@ import cors from "cors";
 import morgan from "morgan";
 import helmet from "helmet";
 import { errorHandler, notFound } from "./middleware/errorHandler.ts";
+import aiRoutes from "./routes/aiRoutes.ts";
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/walks", walkRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/gemini", aiRoutes);
 
 // 404 handler - MUST come after all valid routes
 app.use(notFound);
