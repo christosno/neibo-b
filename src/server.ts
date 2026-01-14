@@ -36,7 +36,7 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/walks", walkRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/gemini", aiRoutes);
+app.use("/api/ai", aiRoutes);
 
 // 404 handler - MUST come after all valid routes
 app.use(notFound);
