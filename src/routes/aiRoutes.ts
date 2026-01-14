@@ -8,15 +8,12 @@ const router = Router();
 const generateTourSchema = z.object({
   city: z.string().min(1),
   neighborhood: z.string().min(1),
-  duration: z.string().min(1),
+  duration: z.number().min(5),
   tourTheme: z.string().min(1),
-  startLocation: z.string().min(1),
-  userPreferences: z.string().min(1),
-  pace: z.string().min(1),
-  groupType: z.string().min(1),
-  budget: z.string().min(1),
+  startLocation: z.string().optional(),
+  language: z.string().optional(),
 });
 
-router.post("/generate-text", validateBody(generateTourSchema), generateTour);
+router.post("/create-tour", validateBody(generateTourSchema), generateTour);
 
 export default router;
