@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.ts";
 import { db } from "../db/connection.ts";
 import { walks, walkTags, spots, type NewSpot } from "../db/schema.ts";
-import { eq, count, desc, and } from "drizzle-orm";
+import { eq, count, asc, and } from "drizzle-orm";
 import type { CustomError } from "../middleware/errorHandler.ts";
 
 export const createWalk = async (
@@ -200,6 +200,51 @@ export const updateWalk = async (
     }
 
     // For any other errors, pass through
+    next(error);
+  }
+};
+
+export const getWalkById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id: walkId } = req.params;
+
+    const walk = await db.query.walks.findFirst({
+      where: eq(walks.id, walkId),
+      with: {
+        spots: {
+          orderBy: asc(spots.positionOrder),
+        },
+        author: {
+          columns: {
+            id: true,
+            username: true,
+            profilePicture: true,
+          },
+        },
+        walkTags: {
+          with: {
+            tag: true,
+          },
+        },
+      },
+    });
+
+    if (!walk) {
+      const error = new Error("Walk not found") as CustomError;
+      error.status = 404;
+      error.name = "NotFoundError";
+      throw error;
+    }
+
+    res.status(200).json({
+      message: "Walk fetched successfully",
+      data: walk,
+    });
+  } catch (error) {
     next(error);
   }
 };

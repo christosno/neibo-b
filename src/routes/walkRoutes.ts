@@ -5,6 +5,7 @@ import { authenticateToken } from "../middleware/auth.ts";
 import {
   createWalk,
   getAllWalks,
+  getWalkById,
   updateWalk,
 } from "../controllers/walksController.ts";
 
@@ -34,8 +35,8 @@ const createWalkSchema = z.object({
 //   name: z.string().min(1),
 // });
 
-const updateWalkParamsSchema = z.object({
-  id: z.string().min(1),
+const walkIdParamsSchema = z.object({
+  id: z.string().uuid("Invalid walk ID format"),
 });
 
 const router = Router();
@@ -44,11 +45,7 @@ const router = Router();
 // /api/walks?page=2&limit=20
 router.get("/", getAllWalks);
 
-router.get("/:id", (req, res) => {
-  res.status(200).json({
-    message: `Walk ${req.params.id} fetched`,
-  });
-});
+router.get("/:id", validateParams(walkIdParamsSchema), getWalkById);
 
 router.post(
   "/",
@@ -59,7 +56,7 @@ router.post(
 router.put(
   "/:id",
   [
-    validateParams(updateWalkParamsSchema),
+    validateParams(walkIdParamsSchema),
     // validateBody(updateWalkSchema),
     authenticateToken,
   ],
