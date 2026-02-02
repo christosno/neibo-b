@@ -1,6 +1,12 @@
 import request from "supertest";
 import app from "../src/server.ts";
-import { cleanDb, createUser, createWalk } from "./setup/dbHelpers.ts";
+import {
+  cleanDb,
+  createUser,
+  createWalk,
+  createWalkReview,
+  createWalkComment,
+} from "./setup/dbHelpers.ts";
 
 describe("Walks endpoints", () => {
   afterEach(async () => {
@@ -122,6 +128,320 @@ describe("Walks endpoints", () => {
         .expect(200);
 
       expect(response.body.data.walkTags).toHaveLength(0);
+    });
+
+    it("should return avgStars as null if walk has no reviews", async () => {
+      const { user } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      const response = await request(app)
+        .get(`/api/walks/${walk.id}`)
+        .expect(200);
+
+      expect(response.body.data.avgStars).toBeNull();
+    });
+
+    it("should return correct avgStars when walk has reviews", async () => {
+      const { user } = await createUser();
+      const { user: reviewer1 } = await createUser();
+      const { user: reviewer2 } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      await createWalkReview({ walkId: walk.id, userId: reviewer1.id, stars: 4 });
+      await createWalkReview({ walkId: walk.id, userId: reviewer2.id, stars: 5 });
+
+      const response = await request(app)
+        .get(`/api/walks/${walk.id}`)
+        .expect(200);
+
+      expect(response.body.data.avgStars).toBe(4.5);
+    });
+  });
+
+  describe("GET /api/walks", () => {
+    it("should return paginated walks with avgStars", async () => {
+      const { user } = await createUser();
+      const { user: reviewer } = await createUser();
+      const { walk: walk1 } = await createWalk({
+        userId: user.id,
+        walkData: { name: "Walk 1" },
+      });
+      const { walk: walk2 } = await createWalk({
+        userId: user.id,
+        walkData: { name: "Walk 2" },
+      });
+
+      await createWalkReview({ walkId: walk1.id, userId: reviewer.id, stars: 5 });
+
+      const response = await request(app).get("/api/walks").expect(200);
+
+      expect(response.body.message).toBe("Walks fetched successfully");
+      expect(response.body.data.walks).toHaveLength(2);
+      expect(response.body.data.pagination).toBeDefined();
+
+      const walkWithReview = response.body.data.walks.find(
+        (w: any) => w.id === walk1.id
+      );
+      const walkWithoutReview = response.body.data.walks.find(
+        (w: any) => w.id === walk2.id
+      );
+
+      expect(walkWithReview.avgStars).toBe(5);
+      expect(walkWithoutReview.avgStars).toBeNull();
+    });
+
+    it("should paginate walks correctly", async () => {
+      const { user } = await createUser();
+      for (let i = 0; i < 5; i++) {
+        await createWalk({ userId: user.id, walkData: { name: `Walk ${i}` } });
+      }
+
+      const response = await request(app)
+        .get("/api/walks?page=1&limit=2")
+        .expect(200);
+
+      expect(response.body.data.walks).toHaveLength(2);
+      expect(response.body.data.pagination.page).toBe(1);
+      expect(response.body.data.pagination.limit).toBe(2);
+      expect(response.body.data.pagination.total).toBe(5);
+      expect(response.body.data.pagination.totalPages).toBe(3);
+      expect(response.body.data.pagination.hasNext).toBe(true);
+      expect(response.body.data.pagination.hasPrevious).toBe(false);
+    });
+  });
+
+  describe("GET /api/walks/:id/comments", () => {
+    it("should return paginated comments for a walk", async () => {
+      const { user } = await createUser();
+      const { user: commenter } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      await createWalkComment({
+        walkId: walk.id,
+        userId: commenter.id,
+        comment: "Great walk!",
+      });
+
+      const response = await request(app)
+        .get(`/api/walks/${walk.id}/comments`)
+        .expect(200);
+
+      expect(response.body.message).toBe("Walk comments fetched successfully");
+      expect(response.body.data.comments).toHaveLength(1);
+      expect(response.body.data.comments[0].comment).toBe("Great walk!");
+      expect(response.body.data.comments[0].user).toBeDefined();
+      expect(response.body.data.comments[0].user.username).toBe(commenter.username);
+      expect(response.body.data.pagination).toBeDefined();
+    });
+
+    it("should return 404 if walk does not exist", async () => {
+      const nonExistentId = "00000000-0000-0000-0000-000000000000";
+
+      const response = await request(app)
+        .get(`/api/walks/${nonExistentId}/comments`)
+        .expect(404);
+
+      expect(response.body.error).toBe("Walk not found");
+    });
+
+    it("should return empty array if walk has no comments", async () => {
+      const { user } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      const response = await request(app)
+        .get(`/api/walks/${walk.id}/comments`)
+        .expect(200);
+
+      expect(response.body.data.comments).toHaveLength(0);
+    });
+  });
+
+  describe("GET /api/walks/:id/reviews", () => {
+    it("should return paginated reviews for a walk", async () => {
+      const { user } = await createUser();
+      const { user: reviewer } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      await createWalkReview({
+        walkId: walk.id,
+        userId: reviewer.id,
+        stars: 5,
+        textReview: "Amazing experience!",
+      });
+
+      const response = await request(app)
+        .get(`/api/walks/${walk.id}/reviews`)
+        .expect(200);
+
+      expect(response.body.message).toBe("Walk reviews fetched successfully");
+      expect(response.body.data.reviews).toHaveLength(1);
+      expect(response.body.data.reviews[0].stars).toBe(5);
+      expect(response.body.data.reviews[0].textReview).toBe("Amazing experience!");
+      expect(response.body.data.reviews[0].user).toBeDefined();
+      expect(response.body.data.reviews[0].user.username).toBe(reviewer.username);
+      expect(response.body.data.pagination).toBeDefined();
+    });
+
+    it("should return 404 if walk does not exist", async () => {
+      const nonExistentId = "00000000-0000-0000-0000-000000000000";
+
+      const response = await request(app)
+        .get(`/api/walks/${nonExistentId}/reviews`)
+        .expect(404);
+
+      expect(response.body.error).toBe("Walk not found");
+    });
+
+    it("should return empty array if walk has no reviews", async () => {
+      const { user } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      const response = await request(app)
+        .get(`/api/walks/${walk.id}/reviews`)
+        .expect(200);
+
+      expect(response.body.data.reviews).toHaveLength(0);
+    });
+  });
+
+  describe("POST /api/walks/:id/comments", () => {
+    it("should create a comment when authenticated", async () => {
+      const { user, token } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      const response = await request(app)
+        .post(`/api/walks/${walk.id}/comments`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ comment: "This is a great walk!" })
+        .expect(201);
+
+      expect(response.body.message).toBe("Comment created successfully");
+      expect(response.body.data.comment).toBe("This is a great walk!");
+      expect(response.body.data.walkId).toBe(walk.id);
+      expect(response.body.data.userId).toBe(user.id);
+    });
+
+    it("should return 401 when not authenticated", async () => {
+      const { user } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      await request(app)
+        .post(`/api/walks/${walk.id}/comments`)
+        .send({ comment: "This is a great walk!" })
+        .expect(401);
+    });
+
+    it("should return 400 when comment is empty", async () => {
+      const { user, token } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      const response = await request(app)
+        .post(`/api/walks/${walk.id}/comments`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ comment: "" })
+        .expect(400);
+
+      expect(response.body.error).toBe("Comment cannot be empty");
+    });
+
+    it("should return 404 if walk does not exist", async () => {
+      const { token } = await createUser();
+      const nonExistentId = "00000000-0000-0000-0000-000000000000";
+
+      const response = await request(app)
+        .post(`/api/walks/${nonExistentId}/comments`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ comment: "Test comment" })
+        .expect(404);
+
+      expect(response.body.error).toBe("Walk not found");
+    });
+  });
+
+  describe("POST /api/walks/:id/reviews", () => {
+    it("should create a review when authenticated", async () => {
+      const { user, token } = await createUser();
+      const { user: walkOwner } = await createUser();
+      const { walk } = await createWalk({ userId: walkOwner.id });
+
+      const response = await request(app)
+        .post(`/api/walks/${walk.id}/reviews`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ stars: 5, textReview: "Amazing walk!" })
+        .expect(201);
+
+      expect(response.body.message).toBe("Review created successfully");
+      expect(response.body.data.stars).toBe(5);
+      expect(response.body.data.textReview).toBe("Amazing walk!");
+      expect(response.body.data.walkId).toBe(walk.id);
+      expect(response.body.data.userId).toBe(user.id);
+    });
+
+    it("should create a review without textReview", async () => {
+      const { user, token } = await createUser();
+      const { user: walkOwner } = await createUser();
+      const { walk } = await createWalk({ userId: walkOwner.id });
+
+      const response = await request(app)
+        .post(`/api/walks/${walk.id}/reviews`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ stars: 4 })
+        .expect(201);
+
+      expect(response.body.data.stars).toBe(4);
+      expect(response.body.data.textReview).toBeNull();
+    });
+
+    it("should return 401 when not authenticated", async () => {
+      const { user } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      await request(app)
+        .post(`/api/walks/${walk.id}/reviews`)
+        .send({ stars: 5 })
+        .expect(401);
+    });
+
+    it("should return 400 when stars is invalid", async () => {
+      const { user, token } = await createUser();
+      const { walk } = await createWalk({ userId: user.id });
+
+      const response = await request(app)
+        .post(`/api/walks/${walk.id}/reviews`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ stars: 6 })
+        .expect(400);
+
+      expect(response.body.error).toBe("Too big: expected number to be <=5");
+    });
+
+    it("should return 400 when user already reviewed the walk", async () => {
+      const { user, token } = await createUser();
+      const { user: walkOwner } = await createUser();
+      const { walk } = await createWalk({ userId: walkOwner.id });
+
+      await createWalkReview({ walkId: walk.id, userId: user.id, stars: 4 });
+
+      const response = await request(app)
+        .post(`/api/walks/${walk.id}/reviews`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ stars: 5 })
+        .expect(400);
+
+      expect(response.body.error).toBe("You have already reviewed this walk");
+    });
+
+    it("should return 404 if walk does not exist", async () => {
+      const { token } = await createUser();
+      const nonExistentId = "00000000-0000-0000-0000-000000000000";
+
+      const response = await request(app)
+        .post(`/api/walks/${nonExistentId}/reviews`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ stars: 5 })
+        .expect(404);
+
+      expect(response.body.error).toBe("Walk not found");
     });
   });
 });

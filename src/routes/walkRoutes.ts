@@ -7,6 +7,10 @@ import {
   getAllWalks,
   getWalkById,
   updateWalk,
+  getWalkComments,
+  getWalkReviews,
+  createWalkComment,
+  createWalkReview,
 } from "../controllers/walksController.ts";
 
 const createWalkSchema = z.object({
@@ -39,6 +43,15 @@ const walkIdParamsSchema = z.object({
   id: z.string().uuid("Invalid walk ID format"),
 });
 
+const createCommentSchema = z.object({
+  comment: z.string().min(1, "Comment cannot be empty"),
+});
+
+const createReviewSchema = z.object({
+  stars: z.number().int().min(1).max(5),
+  textReview: z.string().optional(),
+});
+
 const router = Router();
 
 // get all available walks
@@ -46,6 +59,22 @@ const router = Router();
 router.get("/", getAllWalks);
 
 router.get("/:id", validateParams(walkIdParamsSchema), getWalkById);
+
+router.get("/:id/comments", validateParams(walkIdParamsSchema), getWalkComments);
+
+router.get("/:id/reviews", validateParams(walkIdParamsSchema), getWalkReviews);
+
+router.post(
+  "/:id/comments",
+  [validateParams(walkIdParamsSchema), validateBody(createCommentSchema), authenticateToken],
+  createWalkComment
+);
+
+router.post(
+  "/:id/reviews",
+  [validateParams(walkIdParamsSchema), validateBody(createReviewSchema), authenticateToken],
+  createWalkReview
+);
 
 router.post(
   "/",

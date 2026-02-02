@@ -13,6 +13,8 @@ import {
   type NewWalk,
   type NewSpot,
   type NewTag,
+  type NewWalkReview,
+  type NewWalkComment,
 } from "../../src/db/schema.ts";
 import { hashPassword } from "../../src/utils/passwords.ts";
 import { generateToken } from "../../src/utils/jwt.ts";
@@ -163,6 +165,33 @@ export const createWalk = async ({
   ]);
 
   return { walk, tags: createdTags, spots: createdSpots };
+};
+
+/**
+ * Creates a review for a walk
+ * @param reviewData - Review data (requires walkId, userId, stars)
+ * @returns The created review
+ */
+export const createWalkReview = async (
+  reviewData: Omit<NewWalkReview, "id" | "createdAt" | "updatedAt">
+) => {
+  const [review] = await db.insert(walkReviews).values(reviewData).returning();
+  return review;
+};
+
+/**
+ * Creates a comment for a walk
+ * @param commentData - Comment data (requires walkId, userId, comment)
+ * @returns The created comment
+ */
+export const createWalkComment = async (
+  commentData: Omit<NewWalkComment, "id" | "createdAt" | "updatedAt">
+) => {
+  const [comment] = await db
+    .insert(walkComments)
+    .values(commentData)
+    .returning();
+  return comment;
 };
 
 export const cleanDb = async () => {

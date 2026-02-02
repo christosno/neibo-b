@@ -1,8 +1,15 @@
 import type { NextFunction, Request, Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.ts";
 import { db } from "../db/connection.ts";
-import { walks, walkTags, spots, type NewSpot } from "../db/schema.ts";
-import { eq, count, asc, and } from "drizzle-orm";
+import {
+  walks,
+  walkTags,
+  spots,
+  walkComments,
+  walkReviews,
+  type NewSpot,
+} from "../db/schema.ts";
+import { eq, count, asc, and, desc, avg } from "drizzle-orm";
 import type { CustomError } from "../middleware/errorHandler.ts";
 
 export const createWalk = async (
@@ -212,26 +219,32 @@ export const getWalkById = async (
   try {
     const { id: walkId } = req.params;
 
-    const walk = await db.query.walks.findFirst({
-      where: eq(walks.id, walkId),
-      with: {
-        spots: {
-          orderBy: asc(spots.positionOrder),
-        },
-        author: {
-          columns: {
-            id: true,
-            username: true,
-            profilePicture: true,
+    const [walk, avgResult] = await Promise.all([
+      db.query.walks.findFirst({
+        where: eq(walks.id, walkId),
+        with: {
+          spots: {
+            orderBy: asc(spots.positionOrder),
+          },
+          author: {
+            columns: {
+              id: true,
+              username: true,
+              profilePicture: true,
+            },
+          },
+          walkTags: {
+            with: {
+              tag: true,
+            },
           },
         },
-        walkTags: {
-          with: {
-            tag: true,
-          },
-        },
-      },
-    });
+      }),
+      db
+        .select({ avgStars: avg(walkReviews.stars) })
+        .from(walkReviews)
+        .where(eq(walkReviews.walkId, walkId)),
+    ]);
 
     if (!walk) {
       const error = new Error("Walk not found") as CustomError;
@@ -240,9 +253,16 @@ export const getWalkById = async (
       throw error;
     }
 
+    const avgStars = avgResult[0]?.avgStars
+      ? parseFloat(avgResult[0].avgStars)
+      : null;
+
     res.status(200).json({
       message: "Walk fetched successfully",
-      data: walk,
+      data: {
+        ...walk,
+        avgStars,
+      },
     });
   } catch (error) {
     next(error);
@@ -265,11 +285,35 @@ export const getAllWalks = async (
 
     // Execute queries in parallel for better performance
     const [walksData, totalCountResult] = await Promise.all([
-      // Get paginated walks
-      db.select().from(walks).limit(limit).offset(offset),
+      // Get paginated walks with average stars using left join
+      db
+        .select({
+          id: walks.id,
+          authorId: walks.authorId,
+          name: walks.name,
+          description: walks.description,
+          coverImageUrl: walks.coverImageUrl,
+          duration_estimate: walks.duration_estimate,
+          distance_estimate: walks.distance_estimate,
+          isPublic: walks.isPublic,
+          createdAt: walks.createdAt,
+          updatedAt: walks.updatedAt,
+          avgStars: avg(walkReviews.stars),
+        })
+        .from(walks)
+        .leftJoin(walkReviews, eq(walks.id, walkReviews.walkId))
+        .groupBy(walks.id)
+        .limit(limit)
+        .offset(offset),
       // Get total count of all walks
       db.select({ count: count() }).from(walks),
     ]);
+
+    // Convert avgStars from string to number
+    const walksWithParsedAvg = walksData.map((walk) => ({
+      ...walk,
+      avgStars: walk.avgStars ? parseFloat(walk.avgStars) : null,
+    }));
 
     const total = totalCountResult[0]?.count || 0;
     const totalPages = Math.ceil(total / limit);
@@ -290,7 +334,7 @@ export const getAllWalks = async (
     res.status(200).json({
       message: "Walks fetched successfully",
       data: {
-        walks: walksData,
+        walks: walksWithParsedAvg,
         pagination: {
           page,
           limit,
@@ -302,6 +346,245 @@ export const getAllWalks = async (
           previous: hasPrevious ? buildUrl(page - 1) : null,
         },
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getWalkComments = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id: walkId } = req.params;
+
+    // Verify walk exists
+    const walk = await db.query.walks.findFirst({
+      where: eq(walks.id, walkId),
+    });
+
+    if (!walk) {
+      const error = new Error("Walk not found") as CustomError;
+      error.status = 404;
+      error.name = "NotFoundError";
+      throw error;
+    }
+
+    // Parse pagination parameters
+    const pageParam = req.query.page;
+    const limitParam = req.query.limit;
+
+    const page = Math.max(1, Number(pageParam) || 1);
+    const limit = Math.max(1, Math.min(100, Number(limitParam) || 10));
+    const offset = (page - 1) * limit;
+
+    const [commentsData, totalCountResult] = await Promise.all([
+      db.query.walkComments.findMany({
+        where: eq(walkComments.walkId, walkId),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              profilePicture: true,
+            },
+          },
+        },
+        orderBy: desc(walkComments.createdAt),
+        limit,
+        offset,
+      }),
+      db
+        .select({ count: count() })
+        .from(walkComments)
+        .where(eq(walkComments.walkId, walkId)),
+    ]);
+
+    const total = totalCountResult[0]?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    res.status(200).json({
+      message: "Walk comments fetched successfully",
+      data: {
+        comments: commentsData,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrevious: page > 1,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getWalkReviews = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id: walkId } = req.params;
+
+    // Verify walk exists
+    const walk = await db.query.walks.findFirst({
+      where: eq(walks.id, walkId),
+    });
+
+    if (!walk) {
+      const error = new Error("Walk not found") as CustomError;
+      error.status = 404;
+      error.name = "NotFoundError";
+      throw error;
+    }
+
+    // Parse pagination parameters
+    const pageParam = req.query.page;
+    const limitParam = req.query.limit;
+
+    const page = Math.max(1, Number(pageParam) || 1);
+    const limit = Math.max(1, Math.min(100, Number(limitParam) || 10));
+    const offset = (page - 1) * limit;
+
+    const [reviewsData, totalCountResult] = await Promise.all([
+      db.query.walkReviews.findMany({
+        where: eq(walkReviews.walkId, walkId),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              profilePicture: true,
+            },
+          },
+        },
+        orderBy: desc(walkReviews.createdAt),
+        limit,
+        offset,
+      }),
+      db
+        .select({ count: count() })
+        .from(walkReviews)
+        .where(eq(walkReviews.walkId, walkId)),
+    ]);
+
+    const total = totalCountResult[0]?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    res.status(200).json({
+      message: "Walk reviews fetched successfully",
+      data: {
+        reviews: reviewsData,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrevious: page > 1,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createWalkComment = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id: walkId } = req.params;
+    const { comment } = req.body;
+    const userId = req.user.id;
+
+    // Verify walk exists
+    const walk = await db.query.walks.findFirst({
+      where: eq(walks.id, walkId),
+    });
+
+    if (!walk) {
+      const error = new Error("Walk not found") as CustomError;
+      error.status = 404;
+      error.name = "NotFoundError";
+      throw error;
+    }
+
+    const [newComment] = await db
+      .insert(walkComments)
+      .values({
+        walkId,
+        userId,
+        comment,
+      })
+      .returning();
+
+    res.status(201).json({
+      message: "Comment created successfully",
+      data: newComment,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createWalkReview = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id: walkId } = req.params;
+    const { stars, textReview } = req.body;
+    const userId = req.user.id;
+
+    // Verify walk exists
+    const walk = await db.query.walks.findFirst({
+      where: eq(walks.id, walkId),
+    });
+
+    if (!walk) {
+      const error = new Error("Walk not found") as CustomError;
+      error.status = 404;
+      error.name = "NotFoundError";
+      throw error;
+    }
+
+    // Check if user already reviewed this walk
+    const existingReview = await db.query.walkReviews.findFirst({
+      where: and(eq(walkReviews.walkId, walkId), eq(walkReviews.userId, userId)),
+    });
+
+    if (existingReview) {
+      const error = new Error(
+        "You have already reviewed this walk"
+      ) as CustomError;
+      error.status = 400;
+      error.name = "ValidationError";
+      throw error;
+    }
+
+    const [newReview] = await db
+      .insert(walkReviews)
+      .values({
+        walkId,
+        userId,
+        stars,
+        textReview,
+      })
+      .returning();
+
+    res.status(201).json({
+      message: "Review created successfully",
+      data: newReview,
     });
   } catch (error) {
     next(error);
